@@ -92,6 +92,11 @@ test-app(){
 
 # to hostfile:
 # node1-IP whoami.mydomain.lan
+# docker service create \
+# --name blog \
+# --network traefik-net \
+# --label traefik.port=2368 \
+# --label traefik.frontend.rule=Host:blog.example.com alexellis2/ghost-on-docker
 }
 
 
