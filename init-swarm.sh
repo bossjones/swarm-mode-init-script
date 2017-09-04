@@ -3,8 +3,9 @@
 # todo:
 # admin panel: rancher, shipyard-project, swarmpit
 # network: Contiv Network Plugin
-# proxy: traefic?
-# ssl: portainer-ssl, registry-ssl
+# proxy: traefic-ssl?
+## ssl: portainer-ssl, registry-ssl
+# glusterFS ??
 
 test(){
    if [ -z "$1" ]; then
@@ -64,6 +65,36 @@ certcopy(){
   docker-machine ssh node1 touch /dockerdata/${1}.lock
 }
 
+traefic(){
+  docker-machine ssh node1 "docker network create --driver=overlay traefik-net"
+  docker-machine ssh node1 "docker service create \
+  --name traefik \
+  --mode global \
+  --publish 80:80 --publish 8080:8080 \
+  --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+  --network traefik-net \
+  traefik:v1.1.0-rc1 \
+  --docker \
+  --docker.swarmmode \
+  --docker.domain=swarm.mydomain.lan \
+  --docker.watch \
+  --logLevel=DEBUG \
+  --web"
+}
+
+test-app(){
+  docker service create \
+  --name whoami \
+  --network traefik-net \
+  --label traefik.port=80 \
+  --label traefik.frontend.rule=Host:whoami.mydomain.lan \
+  emilevauge/whoami
+
+# to hostfile:
+# node1-IP whoami.mydomain.lan
+}
+
+
 #--------------------------------------------------------------------------------------------------------------
 
 case "$1" in
@@ -106,7 +137,12 @@ portainer)
       docker-machine ssh node1 "sudo chown -R docker:docker /dockerdata"
       docker-machine ssh node1 docker service rm portainer > /dev/null
       docker-machine ssh node1 docker service rm portainer-ssl > /dev/null
-      docker-machine ssh node1 "docker service create --name portainer --publish 9000:9000 --constraint 'node.role == manager' --mount type=bind,src=/dockerdata/portainer,dst=/data --mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock portainer/portainer -H unix:///var/run/docker.sock"
+      docker-machine ssh node1 "docker service create --name portainer \
+                                --publish 9000:9000 \
+                                --constraint 'node.role == manager' \
+                                --mount type=bind,src=/dockerdata/portainer,dst=/data \
+                                --mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock \
+                                portainer/portainer -H unix:///var/run/docker.sock"
       sleet 10
       docker-machine ssh node1 "docker service ls"
    ;;
@@ -117,12 +153,20 @@ registry)
       docker-machine ssh node$i "sudo mkdir -p /dockerdata/registry"
       docker-machine ssh node$i "sudo chown -R docker:docker /dockerdata"
    done
-   docker-machine ssh node1 "docker service create --name registry --mount type=bind,src=/dockerdata/registry,dst=/var/lib/registry -p 5000:5000 --mode global registry:2"
+   docker-machine ssh node1 "docker service create --name registry \
+                             --mount type=bind,src=/dockerdata/registry,dst=/var/lib/registry \
+                             -p 5000:5000 \
+                             --mode global \
+                             registry:2"
    sleep 10
    docker-machine ssh node1 "docker service ls"
    sleep 10
    docker-machine ssh node1 "docker service ps registry"
    ;;
+traefic)
+  traefic
+  #test-app
+  ;;
 destroy-swarm)
    test $2
    for (( i=1; i<=$N; i++ ))
@@ -145,14 +189,18 @@ portainer-ssl)
      docker-machine ssh node1 "sudo chown -R docker:docker /dockerdata"
      docker-machine ssh node1 docker service rm portainer > /dev/null
      docker-machine ssh node1 docker service rm portainer-ssl > /dev/null
-     docker-machine ssh node1 "docker service create --name portainer-ssl --publish 443:9000 --constraint 'node.role == manager' --mount type=bind,src=/dockerdata/portainer,dst=/data --mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock portainer/portainer -H unix:///var/run/docker.sock"
-     #--ssl --sslcert /certs/portainer.crt --sslkey /certs/portainer.key
+     docker-machine ssh node1 "docker service create --name portainer-ssl \
+                              --publish 443:9000 \
+                              --constraint 'node.role == manager' \
+                              --mount type=bind,src=/dockerdata/portainer,dst=/data \
+                              --mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock \
+                              portainer/portainer -H unix:///var/run/docker.sock"
      sleet 10
      docker-machine ssh node1 "docker service ls"
   ;;
 *) echo "Usage:  ./init-swarm.sh <command> <node number>
 	./init-swarm.sh create|init|weave-net|promote|registry|destroy-swarm|destroy <node number>
-  ./init-swarm.sh portainer"
+  ./init-swarm.sh portainer|traefic"
 #  ./init-swarm.sh portainer-ssl 3 mydomain.lan
    ;;
 esac
