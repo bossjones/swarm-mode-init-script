@@ -103,6 +103,8 @@ create)
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine create --driver virtualbox node$i
+      # --virtualbox-disk-size "20000"  --virtualbox-cpu-count "1" --virtualbox-memory "1024"
+      # docker-machine create -d virtualbox --virtualbox-boot2docker-url https://releases.rancher.com/os/latest/rancheros.iso
    done
    ;;
 init)
