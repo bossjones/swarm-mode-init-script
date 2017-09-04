@@ -4,10 +4,9 @@
 # admin panel: rancher, shipyard-project, swarmpit
 # network: Contiv Network Plugin
 # proxy: traefic?
-# gen cert? and add to secret?
-# tls: portaner-tls, registry-tls
+# ssl: portainer-ssl, registry-ssl
 
-vizsgal(){
+test(){
    if [ -z "$1" ]; then
         echo "Host number not present"
 	exit 1
@@ -16,17 +15,67 @@ vizsgal(){
    fi
 }
 
+certgen(){
+rm -rf ./certs
+mkdir ./certs
+export PASSPHRASE=$(head -c 500 /dev/urandom | tr -dc a-z0-9A-Z | head -c 128; echo)
+export DOMAIN=$1
+
+subj="
+C=HU
+ST=Pest
+O=My Company
+localityName=Budapest
+commonName=$DOMAIN
+organizationalUnitName=OU
+emailAddress=root@$DOMAIN
+"
+
+openssl genrsa -des3 -out certs/$DOMAIN.key -passout env:PASSPHRASE 2048
+
+openssl req \
+    -new \
+    -batch \
+    -subj "$(echo -n "$subj" | tr "\n" "/")" \
+    -key certs/$DOMAIN.key \
+    -out certs/$DOMAIN.csr \
+-passin env:PASSPHRASE
+
+cp certs/$DOMAIN.key certs/$DOMAIN.key.org
+
+openssl rsa -in certs/$DOMAIN.key.org -out certs/$DOMAIN.key -passin env:PASSPHRASE
+
+openssl x509 -req -days 3650 -in certs/$DOMAIN.csr -signkey certs/$DOMAIN.key -out certs/$DOMAIN.crt
+}
+
+certcopy(){
+  docker-machine ssh node1 "rm -rf /dockerdata/certs"
+  docker-machine ssh node1 "sudo mkdir -p /dockerdata"
+  docker-machine ssh node1 "sudo chown -R docker:docker /dockerdata"
+  echo "---------------SCP----------------"
+  docker-machine scp -r ./certs node1:/dockerdata/
+  echo "---------------ls-----------------"
+  docker-machine ssh node1 "ls /dockerdata/certs/"
+  echo "---------------END----------------"
+  # cahck lock file?
+  docker-machine ssh node1 docker secret create ${1}.crt /dockerdata/certs/${1}.crt
+  docker-machine ssh node1 docker secret create ${1}.key /dockerdata/certs/${1}.key
+  docker-machine ssh node1 "rm -rf /dockerdata/certs"
+  docker-machine ssh node1 touch /dockerdata/${1}.lock
+}
+
+#--------------------------------------------------------------------------------------------------------------
 
 case "$1" in
 create)
-   vizsgal $2
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine create --driver virtualbox node$i
    done
    ;;
 init)
-   vizsgal $2
+   test $2
    MANAGGER_IP=$(docker-machine ip node1)
    docker-machine ssh node1 docker swarm init --listen-addr ${MANAGGER_IP} --advertise-addr ${MANAGGER_IP}
 
@@ -38,14 +87,14 @@ init)
    done
    ;;
 promote)
-    vizsgal $2
+    test $2
    for (( i=2; i<=$N; i++ ))
    do
       docker-machine ssh node1 docker node promote node$i
    done
    ;;
 weave-net)
-    vizsgal $2
+    test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine ssh node$i docker plugin install --grant-all-permissions store/weaveworks/net-plugin:2.0.1
@@ -55,12 +104,14 @@ weave-net)
 portainer)
       docker-machine ssh node1 "sudo mkdir -p /dockerdata/portainer"
       docker-machine ssh node1 "sudo chown -R docker:docker /dockerdata"
+      docker-machine ssh node1 docker service rm portainer > /dev/null
+      docker-machine ssh node1 docker service rm portainer-ssl > /dev/null
       docker-machine ssh node1 "docker service create --name portainer --publish 9000:9000 --constraint 'node.role == manager' --mount type=bind,src=/dockerdata/portainer,dst=/data --mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock portainer/portainer -H unix:///var/run/docker.sock"
       sleet 10
       docker-machine ssh node1 "docker service ls"
    ;;
 registry)
-   vizsgal $2
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine ssh node$i "sudo mkdir -p /dockerdata/registry"
@@ -73,20 +124,35 @@ registry)
    docker-machine ssh node1 "docker service ps registry"
    ;;
 destroy-swarm)
-   vizsgal $2
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine ssh node$i docker swarm leave --force
    done
    ;;
 destroy)
-   vizsgal $2
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine rm -f node$i
    done
    ;;
-*) echo "Usage:  init-swarm.sh <command> <node number>
-	init-swarm.sh create|init|weave-net|promote|portainer|registry|destroy-swarm|destroy <node number>"
+portainer-ssl)
+     certgen $3
+     certcopy $3
+     traefic $2
+     docker-machine ssh node1 "sudo mkdir -p /dockerdata/portainer"
+     docker-machine ssh node1 "sudo chown -R docker:docker /dockerdata"
+     docker-machine ssh node1 docker service rm portainer > /dev/null
+     docker-machine ssh node1 docker service rm portainer-ssl > /dev/null
+     docker-machine ssh node1 "docker service create --name portainer-ssl --publish 443:9000 --constraint 'node.role == manager' --mount type=bind,src=/dockerdata/portainer,dst=/data --mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock portainer/portainer -H unix:///var/run/docker.sock"
+     #--ssl --sslcert /certs/portainer.crt --sslkey /certs/portainer.key
+     sleet 10
+     docker-machine ssh node1 "docker service ls"
+  ;;
+*) echo "Usage:  ./init-swarm.sh <command> <node number>
+	./init-swarm.sh create|init|weave-net|promote|registry|destroy-swarm|destroy <node number>
+  ./init-swarm.sh portainer"
+#  ./init-swarm.sh portainer-ssl 3 mydomain.lan
    ;;
 esac
