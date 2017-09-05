@@ -1,0 +1,4 @@
+.git
+certs
+./traefik.toml
+./traefik-ssl.toml
