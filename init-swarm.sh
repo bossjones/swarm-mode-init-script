@@ -13,7 +13,7 @@
 # docker-gc
 # secret: store cert files and traefik toml files?
 
-TEST(){
+test(){
    if [ -z "$1" ]; then
         echo "Host number not present"
 	exit 1
@@ -22,14 +22,14 @@ TEST(){
    fi
 }
 
-#LOCKTEST(){
+#locktest(){
   # cahck lock file? $1
   # if lock file exists echo
   # if not exit0
   # if not all exists?
 #}
 
-CERTGEN(){
+certgen(){
 rm -rf ./certs
 mkdir ./certs
 export PASSPHRASE=$(head -c 500 /dev/urandom | tr -dc a-z0-9A-Z | head -c 128; echo)
@@ -62,11 +62,11 @@ openssl rsa -in certs/$DOMAIN.key.org -out certs/$DOMAIN.key -passin env:PASSPHR
 openssl x509 -req -days 3650 -in certs/$DOMAIN.csr -signkey certs/$DOMAIN.key -out certs/$DOMAIN.crt
 }
 
-CERTCOPY(){
+certcopy(){
   docker-machine --native-ssh ssh node1 "rm -rf /dockerdata/traefik/certs"
   docker-machine --native-ssh ssh node1 "sudo mkdir -p /dockerdata/traefik"
   docker-machine --native-ssh ssh node1 "sudo chown -R docker:docker /dockerdata"
-  TEST $1
+  test $1
   for (( i=1; i<=$N; i++ ))
   do
      echo "---------------SCP----------------"
@@ -80,7 +80,7 @@ CERTCOPY(){
   docker-machine --native-ssh ssh node1 touch /dockerdata/${1}.lock
 }
 
-TRAEFIK(){
+traefik(){
   docker-machine --native-ssh ssh node1 "docker service create \
   --name traefik \
   --publish 80:80 \
@@ -106,7 +106,7 @@ TRAEFIK(){
   docker-machine --native-ssh ssh node1 "docker service ps traefik"
 }
 
-TRAEFIK-SSL(){
+traefik-ssl(){
   docker-machine --native-ssh ssh node1 "docker service create \
   --name traefik-ssl \
   --publish 80:80 \
@@ -134,7 +134,7 @@ TRAEFIK-SSL(){
   docker-machine --native-ssh ssh node1 "docker service ps traefik-ssl"
 }
 
-TEST-APP(){
+test-app(){
     docker-machine --native-ssh ssh node1 "docker service create \
      --name blog \
      --network traefik-net \
@@ -156,7 +156,7 @@ TEST-APP(){
 
 case "$1" in
 create)
-   TEST $2
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine create --driver virtualbox node$i
@@ -166,14 +166,14 @@ create)
    done
    ;;
 start)
-  TEST $2
+  test $2
   for (( i=1; i<=$N; i++ ))
   do
      docker-machine start node$i
   done
   ;;
 init)
-   TEST $2
+   test $2
    MANAGGER_IP=$(docker-machine ip node1)
    docker-machine --native-ssh ssh node1 docker swarm init --listen-addr ${MANAGGER_IP} --advertise-addr ${MANAGGER_IP}
 
@@ -185,14 +185,14 @@ init)
    done
    ;;
 promote)
-    TEST $2
+    test $2
    for (( i=2; i<=$N; i++ ))
    do
       docker-machine --native-ssh ssh node1 docker node promote node$i
    done
    ;;
 weave-net)
-    TEST $2
+    test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine --native-ssh ssh node$i docker plugin install --grant-all-permissions store/weaveworks/net-plugin:2.0.1
@@ -200,7 +200,7 @@ weave-net)
    docker-machine --native-ssh ssh node1 docker network create --driver=store/weaveworks/net-plugin:2.0.1 weavenet
    ;;
 portainer) # global
-      # LOCKTEST /dockerdata/portainer.lock
+      # locktest /dockerdata/portainer.lock
       docker-machine --native-ssh ssh node1 "sudo mkdir -p /dockerdata/portainer"
       docker-machine --native-ssh ssh node1 "sudo chown -R docker:docker /dockerdata"
       docker-machine --native-ssh ssh node1 docker service rm portainer > /dev/null
@@ -217,9 +217,9 @@ portainer) # global
       docker-machine --native-ssh ssh node1 "docker service ls"
    ;;
    portainer-ssl) # global
-      # LOCKTEST /dockerdata/portainer.lock
-      # LOCKTEST /dockerdata/traefik.lock
-      # LOCKTEST /dockerdata/domain.lock
+      # locktest /dockerdata/portainer.lock
+      # locktest /dockerdata/traefik.lock
+      # locktest /dockerdata/domain.lock
       docker-machine --native-ssh ssh node1 "sudo mkdir -p /dockerdata/portainer"
       docker-machine --native-ssh ssh node1 "sudo chown -R docker:docker /dockerdata"
       docker-machine --native-ssh ssh node1 docker service rm portainer > /dev/null
@@ -227,7 +227,7 @@ portainer) # global
                                --name 'portainer' \
                                --constraint 'node.role == manager' \
                                --network 'traefik-net' \
-                               --replicas "1" \
+                               --replicas '1' \
                                --mount type=bind,src=/dockerdata/portainer,dst=/data \
                                --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
                                --label 'traefik.frontend.rule=Host:$3;PathPrefixStrip:/portainer' \
@@ -242,8 +242,8 @@ portainer) # global
          docker-machine --native-ssh ssh node1 "docker service ls"
       ;;
 registry) # global
-   # LOCKTEST /dockerdata/registry.lock
-   TEST $2
+   # locktest /dockerdata/registry.lock
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine --native-ssh ssh node$i "sudo mkdir -p /dockerdata/registry"
@@ -260,8 +260,8 @@ registry) # global
    docker-machine --native-ssh ssh node1 "docker service ps registry"
    ;;
 traefik)
-      # LOCKTEST /dockerdata/traefik.lock
-config="
+      # locktest /dockerdata/traefik.lock
+config='
 [docker]
 endpoint = "unix:///var/run/docker.sock"
 # default domain
@@ -271,8 +271,8 @@ swarmmode = true
 [accessLog]
   filePath = "/log/access.log"
 traefikLogsFile = "/log/traefik.log"
-"
-   TEST $2
+'
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine --native-ssh ssh node$1 docker service rm traefik-ssl
@@ -283,14 +283,14 @@ traefikLogsFile = "/log/traefik.log"
       docker-machine --native-ssh ssh node$1 echo /dockerdata/traefik.lock
    done
   #test2 $3
-  TRAEFIK $3
-  #TEST-APP $3
+  traefik $3
+  #test-app $3
   ;;
 traefik-ssl)
-   # LOCKTEST /dockerdata/traefik.lock
-   CERTGEN  $3 # domain
-   CERTCOPY $2 # nod number
-config="
+   # locktest /dockerdata/traefik.lock
+   certgen  $3 # domain
+   certcopy $2 # nod number
+config='
 defaultEntryPoints = ["http", "https"]
 [web]
 # Port for the status page
@@ -315,8 +315,8 @@ swarmmode = true
 [accessLog]
   filePath = "/log/access.log"
 traefikLogsFile = "/log/traefik.log"
-"
-   TEST $2
+'
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine --native-ssh ssh node$1 docker service rm traefik
@@ -326,28 +326,36 @@ traefikLogsFile = "/log/traefik.log"
       docker-machine --native-ssh ssh node$1 echo ${config} > /dockerdata/traefik/traefik.toml
    done
     #test2 $3
-    TRAEFIK-SSL $3
-    #TEST-APP $3
+    traefik-ssl $3
+    #test-app $3
    ;;
+stop)
+ test $2
+ for (( i=1; i<=$N; i++ ))
+ do
+    docker-machine stop node$i
+ done
+ ;;
 destroy-swarm)
-   TEST $2
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine --native-ssh ssh node$i docker swarm leave --force
    done
    ;;
 destroy)
-   TEST $2
+   test $2
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine rm -f node$i
    done
    ;;
 certgen)
-   CERTGEN  $2
+   certgen  $2
    ;;
 *) echo "Usage:  ./init-swarm.sh <command> <node number>
-	./init-swarm.sh create|init|weave-net|promote|registry|destroy-swarm|destroy <node number>
+	./init-swarm.sh create|init|promote|start|stop|destroy-swarm|destroy <node number>
+  ./init-swarm.sh weave-net|registry <node number>
   ./init-swarm.sh portainer
   ./init-swarm.sh traefik|traefik-ssl 3 mydomain.lan"
    ;;
