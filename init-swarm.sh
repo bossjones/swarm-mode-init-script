@@ -22,12 +22,12 @@ TEST(){
    fi
 }
 
-LOCKTEST(){
+#LOCKTEST(){
   # cahck lock file? $1
   # if lock file exists echo
   # if not exit0
   # if not all exists?
-}
+#}
 
 CERTGEN(){
 rm -rf ./certs
@@ -165,6 +165,13 @@ create)
       # create shared folder
    done
    ;;
+start)
+  TEST $2
+  for (( i=1; i<=$N; i++ ))
+  do
+     docker-machine start node$i
+  done
+  ;;
 init)
    TEST $2
    MANAGGER_IP=$(docker-machine ip node1)
@@ -251,8 +258,6 @@ registry) # global
    docker-machine --native-ssh ssh node1 "docker service ls"
    sleep 10
    docker-machine --native-ssh ssh node1 "docker service ps registry"
-   ;;
-registry)
    ;;
 traefik)
       # LOCKTEST /dockerdata/traefik.lock
