@@ -17,11 +17,5 @@
 
 
 
-glusterfs
- - install glusterfs (dockerfile)
- - mkdir /data (dockerfile)
- - brick=/data (dockerfile)
-
- https://github.com/djmaze/gluster-on-docker/blob/master/server/start.sh
- https://www.digitalocean.com/community/tutorials/how-to-create-a-redundant-storage-pool-using-glusterfs-on-ubuntu-servers
-	
+----
+https://github.com/blog/2104-working-with-submodules
