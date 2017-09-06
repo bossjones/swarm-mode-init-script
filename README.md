@@ -1,1 +1,1 @@
-"# swarm-mode-init-script" 
+# swarm-mode-init-script
