@@ -63,21 +63,21 @@ openssl x509 -req -days 3650 -in certs/$DOMAIN.csr -signkey certs/$DOMAIN.key -o
 }
 
 certcopy(){
-  docker-machine ssh node1 "rm -rf /dockerdata/traefik/certs"
-  docker-machine ssh node1 "sudo mkdir -p /dockerdata/traefik"
-  docker-machine ssh node1 "sudo chown -R docker:docker /dockerdata"
   test $1
   for (( i=1; i<=$N; i++ ))
   do
+     docker-machine ssh node$i "rm -rf /dockerdata/traefik/certs"
+     docker-machine ssh node$i "sudo mkdir -p /dockerdata/traefik"
+     docker-machine ssh node$i "sudo chown -R docker:docker /dockerdata"
      echo "---------------SCP----------------"
      docker-machine scp -r ./certs node$i:/dockerdata/traefik/
      echo "---------------ls-----------------"
      docker-machine ssh node$i "ls /dockerdata/traefik/certs/"
      echo "---------------END----------------"
   done
-  docker-machine ssh node1 docker secret create ${1}.crt /dockerdata/traefik/certs/${1}.crt
-  docker-machine ssh node1 docker secret create ${1}.key /dockerdata/traefik/certs/${1}.key
-  docker-machine ssh node1 touch /dockerdata/${1}.lock
+  docker-machine ssh node1 docker secret create ${2}.crt /dockerdata/traefik/certs/${2}.crt
+  docker-machine ssh node1 docker secret create ${2}.key /dockerdata/traefik/certs/${2}.key
+  docker-machine ssh node1 touch /dockerdata/certlock.lock
 }
 
 traefik(){
@@ -114,7 +114,7 @@ traefik-ssl(){
   --publish 443:443 \
   --mode global \
   --label traefik.backend=traefik \
-  --label traefik.frontend.rule=Host:traefik.mydomain.lan \
+  --label traefik.frontend.rule=Host:traefik.$1 \
   --label traefik.port=8080 \
   --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
   --mount type=bind,source=/dockerdata/traefik/traefik.toml,target=/etc/traefik/traefik.toml \
@@ -132,6 +132,7 @@ traefik-ssl(){
   docker-machine ssh node1 "docker service ls"
   sleep 10
   docker-machine ssh node1 "docker service ps traefik-ssl"
+  # hostsfile traefik.$1
 }
 
 test-app(){
@@ -146,34 +147,32 @@ test-app(){
      docker-machine ssh node1 "docker service ls"
      sleep 10
      docker-machine ssh node1 "docker service ps blog"
-
+     hostsfile blog.$1
 # to hostfile:
 # node1-IP blog.<domain>
 }
 
+hostsfile(){
+  MANAGGER_IP=$(docker-machine ip node1)
+  echo $MANAGGER_IP' '$1 >> /etc/hosts
+}
 
 #--------------------------------------------------------------------------------------------------------------
 
 case "$1" in
 create)
    test $2
-   DIR=`pwd`
-   DIR=`cygpath -d $DIR`
+
    for (( i=1; i<=$N; i++ ))
    do
       docker-machine create --driver virtualbox node$i
       # --virtualbox-disk-size "20000"  --virtualbox-cpu-count "1" --virtualbox-memory "1024"
       # docker-machine create -d virtualbox --virtualbox-boot2docker-url https://releases.rancher.com/os/latest/rancheros.iso
       # create shared folder
-      #docker-machine stop node$i
-      #sleep 10
+      #DIR=`pwd`
+      #DIR=`cygpath -d $DIR`
+      # on vm: /cygwin.../($PWD)
       #VBoxManage sharedfolder add node$i --name node$i --hostpath $DIR --automount
-      #docker-machine start node$i
-      #slep 10
-      #docker-machine ssh node$i "mkdir /home/docker/hostfolder"
-      #docker-machine ssh node$i echo "sudo mount -t vboxsf -o uid=1000,gid=50 node${i} /home/docker/hostfolder" >> /mnt/sda1/var/lib/boot2docker/profile
-      #docker-machine ssh node$i 'sudo mount -t vboxsf -o "defaults,uid=`id -u docker`,gid=`id -g docker`,iocharset=utf8,rw"' "node$i /home/docker/hostfolder"
-      #docker-machine ssh node$i sudo tail -c 5 /mnt/sda1/var/lib/boot2docker/profile
    done
    ;;
 start)
@@ -190,6 +189,7 @@ init)
 
 #  MANAGER_TOKEN=$(docker-machine ssh node1 docker swarm join-token -q manager)
    WORKER_TOKEN=$(docker-machine ssh node1 docker swarm join-token -q worker)
+   sleep 5
    for (( i=2; i<=$N; i++ ))
    do
       docker-machine ssh node$i docker swarm join --token ${WORKER_TOKEN} ${MANAGGER_IP}:2377
@@ -227,31 +227,31 @@ portainer) # global
       sleet 10
       docker-machine ssh node1 "docker service ls"
    ;;
-   portainer-ssl) # global
-      # locktest /dockerdata/portainer.lock
-      # locktest /dockerdata/traefik.lock
-      # locktest /dockerdata/domain.lock
-      docker-machine ssh node1 "sudo mkdir -p /dockerdata/portainer"
-      docker-machine ssh node1 "sudo chown -R docker:docker /dockerdata"
-      docker-machine ssh node1 docker service rm portainer > /dev/null
-      docker-machine ssh node1 "docker service create \
-                               --name 'portainer' \
-                               --constraint 'node.role == manager' \
-                               --network 'traefik-net' \
-                               --replicas '1' \
-                               --mount type=bind,src=/dockerdata/portainer,dst=/data \
-                               --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
-                               --label 'traefik.frontend.rule=Host:$3;PathPrefixStrip:/portainer' \
-                               --label 'traefik.backend=portainer' \
-                               --label 'traefik.port=9000' \
-                               --label 'traefik.docker.network=traefik-net' \
-                               --reserve-memory '20M' --limit-memory '40M' \
-                               --restart-condition 'any' --restart-max-attempts '55' \
-                               --update-delay '5s' --update-parallelism '1' \
-                               portainer/portainer"
-         sleet 10
-         docker-machine ssh node1 "docker service ls"
-      ;;
+portainer-ssl) # global
+  # locktest /dockerdata/portainer.lock
+  # locktest /dockerdata/traefik.lock
+  # locktest /dockerdata/domain.lock
+  docker-machine ssh node1 "sudo mkdir -p /dockerdata/portainer"
+  docker-machine ssh node1 "sudo chown -R docker:docker /dockerdata"
+  docker-machine ssh node1 docker service rm portainer > /dev/null
+  docker-machine ssh node1 "docker service create \
+                           --name 'portainer' \
+                           --constraint 'node.role == manager' \
+                           --network 'traefik-net' \
+                           --replicas '1' \
+                           --mount type=bind,src=/dockerdata/portainer,dst=/data \
+                           --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
+                           --label 'traefik.frontend.rule=Host:$3;PathPrefixStrip:/portainer' \
+                           --label 'traefik.backend=portainer' \
+                           --label 'traefik.port=9000' \
+                           --label 'traefik.docker.network=traefik-net' \
+                           --reserve-memory '20M' --limit-memory '40M' \
+                           --restart-condition 'any' --restart-max-attempts '55' \
+                           --update-delay '5s' --update-parallelism '1' \
+                           portainer/portainer"
+     sleet 10
+     docker-machine ssh node1 "docker service ls"
+  ;;
 registry) # global
    # locktest /dockerdata/registry.lock
    test $2
@@ -272,26 +272,17 @@ registry) # global
    ;;
 traefik)
       # locktest /dockerdata/traefik.lock
-config='
-[docker]
-endpoint = "unix:///var/run/docker.sock"
-# default domain
-domain = "mydomain.lan"
-watch = true
-swarmmode = true
-[accessLog]
-  filePath = "/log/access.log"
-traefikLogsFile = "/log/traefik.log"
-'
    test $2
+      docker-machine ssh node1 "docker network create --driver=overlay traefik-net" > /dev/null
    for (( i=1; i<=$N; i++ ))
    do
-      docker-machine ssh node$1 docker service rm traefik-ssl
-      docker-machine ssh node$1 "docker network create --driver=overlay traefik-net"
-      docker-machine ssh node$1 "sudo mkdir -p /dockerdata/traefik/log"
-      docker-machine ssh node$1 "sudo chown -R docker:docker /dockerdata"
-      docker-machine ssh node$1 echo ${config} > /dockerdata/traefik/traefik.toml
-      docker-machine ssh node$1 echo /dockerdata/traefik.lock
+      docker-machine ssh node$i docker service rm traefik-ssl > /dev/null
+      docker-machine ssh node$i "sudo mkdir -p /dockerdata/traefik/log"
+      docker-machine ssh node$i "sudo chown -R docker:docker /dockerdata"
+      cp ./traefik.toml.base ./traefik.toml
+      sed -i 's/<DOMAIN>/'$3'/g' ./traefik.toml > /dev/null
+      docker-machine  scp ./traefik.toml node$i:/dockerdata/traefik/traefik.toml
+      #docker-machine  ssh node$i echo /dockerdata/traefik.lock
    done
   #test2 $3
   traefik $3
@@ -300,41 +291,17 @@ traefikLogsFile = "/log/traefik.log"
 traefik-ssl)
    # locktest /dockerdata/traefik.lock
    certgen  $3 # domain
-   certcopy $2 # nod number
-config='
-defaultEntryPoints = ["http", "https"]
-[web]
-# Port for the status page
-address = ":8080"
-[entryPoints]
-  [entryPoints.http]
-  address = ":80"
-    [entryPoints.http.redirect]
-      entryPoint = "https"
-  [entryPoints.https]
-  address = ":443"
-    [entryPoints.https.tls]
-      [[entryPoints.https.tls.certificates]]
-      CertFile = "/certs/$3.crt"
-      KeyFile = "/certs/$3.key"
-[docker]
-endpoint = "unix:///var/run/docker.sock"
-# default domain
-domain = "$3"
-watch = true
-swarmmode = true
-[accessLog]
-  filePath = "/log/access.log"
-traefikLogsFile = "/log/traefik.log"
-'
+   certcopy $2 $3 # nod number, domain
    test $2
+   docker-machine ssh node1 "docker network create --driver=overlay traefik-net" >> /dev/null
    for (( i=1; i<=$N; i++ ))
    do
-      docker-machine ssh node$1 docker service rm traefik
-      docker-machine ssh node$1 "docker network create --driver=overlay traefik-net"
-      docker-machine ssh node$1 "sudo mkdir -p /dockerdata/traefik/log"
-      docker-machine ssh node$1 "sudo chown -R docker:docker /dockerdata"
-      docker-machine ssh node$1 echo ${config} > /dockerdata/traefik/traefik.toml
+      docker-machine ssh node$i docker service rm traefik > /dev/null
+      docker-machine ssh node$i "sudo mkdir -p /dockerdata/traefik/log"
+      docker-machine ssh node$i "sudo chown -R docker:docker /dockerdata"
+      cp ./traefik-ssl.toml.base ./traefik-ssl.toml
+      sed -i 's/<DOMAIN>/'$3'/g' ./traefik-ssl.toml > /dev/null
+      docker-machine  scp ./traefik-ssl.toml node$i:/dockerdata/traefik/traefik.toml
    done
     #test2 $3
     traefik-ssl $3
