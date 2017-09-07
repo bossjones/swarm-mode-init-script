@@ -1,21 +1,46 @@
-1 create hosts
-2 create chare to hosts
-3 init swarm
-(4) install network plugin (weave/...)
-(5) install weave scope
-(6) init weave scope
-(?) start glusterfs replication
-  - build from file
-7 start logserver (wit traefik configured)
-8 start traefik (with log configured)
-	- toml as secret?
-	- ssl
-9 start registry (with log config)
-  - push glusterfs image
-10 start admin page (with log configured) (wit traefik configured)
-	- config registry connection
+host creation [X]
+global file distribution
+  - virtualbox fileshare
+  - glusterfs ?
+  - minio ?
+docker orchestration
+  - init swarm [X]
+  - kubernetes
+docker logging
+  - ELK cluster? [ ]
+    - connect to all servicea
+dicker monitoring
+  - cAdvisor influxdb grafana [X]
+    - influxdb cluster?
+  - prometheus
+    - clustering
+    - add metrics to all servicea
+  - Docker Flow Monitor (autocongured prometheus)
+docker networking
+  - weavenet [X]
+  - weave scope
+docker loadbalance
+  - traefik [X]
+    - (SSL) [X]
+    - add traefik domain to all servicea
+  - Docker Flow Proxy
+docker admin panel
+  - portainer (connect to registry) [X]
+docker registry
+docker auto-scal
 
+---
+monitoring:
+ADD prometheus rules from stefanprodan/dockprom
+rule_files:
+  - "targets.rules"
+  - "host.rules"
+  - "containers.rules"
 
+# store config like secret
+# --config src=homepage,target="\inetpub\wwwroot\index.html"
+
+docker config create homepage index.html
 
 ----
 https://github.com/blog/2104-working-with-submodules
