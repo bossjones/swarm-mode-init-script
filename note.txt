@@ -3,6 +3,7 @@ global file distribution
   - virtualbox fileshare
   - glusterfs ?
   - minio ?
+  - infinit [ ]
 docker orchestration
   - init swarm [X]
   - kubernetes
