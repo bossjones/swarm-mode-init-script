@@ -1,4 +1,4 @@
-version: "3.3"
+version: '3.3'
 
 networks:
     traefik-net:
@@ -7,7 +7,7 @@ networks:
 volumes:
     data:
 
-configs:
+secrets:
   traefik.toml:
     file: ./traefik-ssl.toml
   mydomain.lan.crt:
@@ -35,10 +35,13 @@ services:
           - "com.df.notify=true"
           - "com.df.scrapePort=8080"
           - "traefik.port=8080"
-      configs:
+      secrets:
       - source: traefik.toml
         target: /etc/traefik/traefik.toml
+        mode: 0444
       - source: mydomain.lan.crt
         target: /certs/mydomain.lan.crt
+        mode: 0444
       - source: mydomain.lan.key
         target: /certs/mydomain.lan.key
+        mode: 0444

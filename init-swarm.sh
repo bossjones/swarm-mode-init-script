@@ -53,6 +53,8 @@ cp certs/$DOMAIN.key certs/$DOMAIN.key.org
 openssl rsa -in certs/$DOMAIN.key.org -out certs/$DOMAIN.key -passin env:PASSPHRASE
 
 openssl x509 -req -days 3650 -in certs/$DOMAIN.csr -signkey certs/$DOMAIN.key -out certs/$DOMAIN.crt
+
+cat $DOMAIN.crt $DOMAIN.key  | tee $DOMAIN.pem
 }
 
 certcopy(){
