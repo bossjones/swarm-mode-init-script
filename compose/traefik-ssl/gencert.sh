@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 export PASSPHRASE=$(head -c 500 /dev/urandom | tr -dc a-z0-9A-Z | head -c 128; echo)
 export DOMAIN=$1
