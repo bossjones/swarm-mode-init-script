@@ -1,0 +1,22 @@
+version: "3.3"
+
+networks:
+    traefik-net:
+      external: true
+
+
+services:
+
+    traefik-ssl:
+      image: traefik
+      command: --consul --consul.endpoint=127.0.0.1:8500
+      networks:
+        - traefik-net
+      ports:
+        - "443:443"
+        - "80:80"
+        - "8080:8080"
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - /home/docker/compose/traefik-ssl/traefik-ssl.toml:/etc/traefik/traefik.toml
+#       - /dockerdata/traefik/log:/log

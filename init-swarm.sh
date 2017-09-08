@@ -76,6 +76,14 @@ certcopy(){
 #--------------------------------------------------------------------------------------------------------------
 
 case "$1" in
+scp)
+   test $2
+
+   for (( i=1; i<=$N; i++ ))
+   do
+      docker-machine scp -r ./compose node$i:/home/docker/
+   done
+   ;;
 create)
    test $2
 
@@ -148,8 +156,8 @@ certgen)
    ;;
 *) echo "Usage:  ./init-swarm.sh <command> <node number>
 	./init-swarm.sh create|init|promote|start|stop|destroy-swarm|destroy <node number>
-  ./init-swarm.sh weave-net|registry <node number>
-  ./init-swarm.sh portainer
-  ./init-swarm.sh traefik|traefik-ssl 3 mydomain.lan"
+  ./init-swarm.sh weave-net|scp <node number>
+  ./init-swarm.sh certgen
+  "
    ;;
 esac
