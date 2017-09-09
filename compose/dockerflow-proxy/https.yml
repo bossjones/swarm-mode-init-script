@@ -20,4 +20,3 @@ services:
 networks:
   proxy_public:
     external: true
-

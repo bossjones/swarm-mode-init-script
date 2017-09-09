@@ -124,6 +124,58 @@ promote)
       docker-machine ssh node1 docker node promote node$i
    done
    ;;
+add-disk)
+   export PATH=$PATH:"/c/Program Files/Oracle/VirtualBox"
+   user=`whoami`
+   test $2
+   for (( i=1; i<=$N; i++ ))
+   do
+     if [ -e /c/Users/$user/.docker/machine/machines/node$i/disk.lock ]
+     then
+       echo "lock file exists"
+     else
+       docker-machine stop node$i
+       sleep 5
+       #VBoxManage closemedium disk /Users/$user/.docker/machine/machines/node$i/node$i-2.vmdk --delete > /dev/null 2 &1
+       VBoxManage createhd --filename /Users/$user/.docker/machine/machines/node$i/node$i-2.vmdk --size 5120 --variant Standard
+       #VBoxManage storagectl node$i --name "SATA Controller" --add sata
+       VBoxManage storageattach node$i --storagectl "SATA" --port 3 --device 0 --type hdd --medium /Users/$user/.docker/machine/machines/node$i/node$i-2.vmdk
+       # SATA Controller or SATAController
+       touch /c/Users/$user/.docker/machine/machines/node$i/disk.lock
+       #docker-machine start node$i
+     fi
+   done
+   ;;
+#https://github.com/Berndinox/swarm-portworx
+#init-px)
+#    docker-machine ssh node1 docker network create --driver overlay --subnet 172.20.0.0/24 consul-net
+#    docker-machine ssh node1 docker stack deploy -c /home/doncker/compose/consul/consul.yml consul
+#    test $2
+#    for (( i=1; i<=$N; i++ ))
+#    do
+#      docker-machine scp -r ./compose node$i:/home/docker/
+#      docker-machine ssh node$i sudo mount --make-shared /
+#      docker-machine ssh node$i sudo mkdir /etc/pwx
+#      docker-machine ssh node$i sudo chown -R docker:docker /etc/pwx
+#      docker-machine ssh node$i cp /home/docker/compose/portworx/config.json /etc/pwx/
+#      docker-machine ssh node$i "docker run --restart=always --name px -d --net=host \
+#                                --privileged=true \
+#                                -v /run/docker/plugins:/run/docker/plugins \
+#                                -v /var/lib/osd:/var/lib/osd \
+#                                -v /dev:/dev \
+#                                -v /etc/pwx:/etc/pwx \
+#                                -v /opt/pwx/bin:/export_bin \
+#                                -v /var/run/docker.sock:/var/run/docker.sock \
+#                                -v /var/cores:/var/cores \
+#                                -v /usr/src:/usr/src \
+#                                -v /lib/modules:/lib/modules \
+#                                --ipc=host \
+#                                portworx/px-dev"
+#       docker-machine ssh node$i ln -s /opt/pwx/bin/pxctl /bin/pxctl
+#       docker-machine ssh node$i sudo chown -R docker:docker /bin/pxctl
+#    done
+#   docker-machine ssh node1 pxctl status
+#   ;;
 weave-net)
     test $2
    for (( i=1; i<=$N; i++ ))
@@ -150,6 +202,7 @@ destroy)
    test $2
    for (( i=1; i<=$N; i++ ))
    do
+      rm -f /c/Users/$user/.docker/machine/machines/node$i/disk.lock
       docker-machine rm -f node$i
    done
    ;;
@@ -158,8 +211,7 @@ certgen)
    ;;
 *) echo "Usage:  ./init-swarm.sh <command> <node number>
 	./init-swarm.sh create|init|promote|start|stop|destroy-swarm|destroy <node number>
-  ./init-swarm.sh weave-net|scp <node number>
-  ./init-swarm.sh certgen
-  "
+  ./init-swarm.sh add-disk|weave-net|scp <node number>
+  ./init-swarm.sh certgen"
    ;;
 esac
