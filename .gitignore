@@ -1,5 +1,8 @@
 certs
 /*.toml
+<<<<<<< HEAD
 *.csr
 *.key*
 *.pem
+=======
+>>>>>>> parent of 0116d1d... v21 - working https with secret
