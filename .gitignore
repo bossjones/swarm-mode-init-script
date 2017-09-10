@@ -1,6 +1,5 @@
 certs
 /*.toml
-*.crt
+*.csr
 *.key*
 *.pem
-*.csr

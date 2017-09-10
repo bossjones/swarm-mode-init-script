@@ -1,4 +1,4 @@
-version: '3.3'
+version: "3.3"
 
 networks:
     proxy:
@@ -38,10 +38,7 @@ services:
       configs:
       - source: traefik.toml
         target: /etc/traefik/traefik.toml
-        mode: 0444
       - source: mydomain.lan.crt
         target: /certs/mydomain.lan.crt
-        mode: 0444
       - source: mydomain.lan.key
         target: /certs/mydomain.lan.key
-        mode: 0444

@@ -28,5 +28,3 @@ cp $DOMAIN.key $DOMAIN.key.org
 openssl rsa -in $DOMAIN.key.org -out $DOMAIN.key -passin env:PASSPHRASE
 
 openssl x509 -req -days 3650 -in $DOMAIN.csr -signkey $DOMAIN.key -out $DOMAIN.crt
-
-cat $DOMAIN.crt $DOMAIN.key  | tee $DOMAIN.pem
