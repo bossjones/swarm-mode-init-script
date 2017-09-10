@@ -1,7 +1,7 @@
 version: "3.3"
 
 networks:
-    traefik-net:
+    proxy:
       external: true
 
 services:
@@ -10,22 +10,27 @@ services:
     image: portainer/portainer
     command: -H unix:///var/run/docker.sock
     networks:
-      - traefik-net
+      - proxy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 #     - /opt/portainer/data:/data
     deploy:
       labels:
-        - "com.df.notify=true"
-        - "com.df.scrapePort=9000"
+        - com.df.notify=true
+        - com.df.distribute=true
+        - com.df.port=9000
+        - com.df.servicePath=/#/auth
         - "traefik.port=9000"
         - "traefik.frontend.rule=Host:mydomain.lan;PathPrefixStrip:/portainer"
-        - "traefik.docker.network=traefik-net"
+        - "traefik.docker.network=proxy"
     depends_on:
-      - traefik-ssl
+      - proxy
+
 
   watchtower:
     image: v2tec/watchtower
     command: --cleanup portainer-app portainer-watchtower portainer/templates
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - proxy

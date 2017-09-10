@@ -1,13 +1,13 @@
 version: '3.3'
 
 networks:
-    traefik-net:
+    proxy:
       external: true
 
 volumes:
     data:
 
-secrets:
+configs:
   traefik.toml:
     file: ./traefik-ssl.toml
   mydomain.lan.crt:
@@ -21,7 +21,7 @@ services:
       image: traefik
       command: -c /dev/null --web --docker --docker.swarmmode --docker.watch --docker.domain=mydomain.lan --logLevel=DEBUG
       networks:
-        - traefik-net
+        - proxy
       ports:
         - "443:443"
         - "80:80"
@@ -35,7 +35,7 @@ services:
           - "com.df.notify=true"
           - "com.df.scrapePort=8080"
           - "traefik.port=8080"
-      secrets:
+      configs:
       - source: traefik.toml
         target: /etc/traefik/traefik.toml
         mode: 0444
